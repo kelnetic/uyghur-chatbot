@@ -6,3 +6,6 @@ The current plans are to:
 - Use Pinecone's Canopy framework to handle embedding, retrieval, and chatting
 - Use Streamlit to build a simple frontend view
 - Host on Huggingface Spaces 
+
+## How to run the server locally:
+- Run `docker compose up --build`. The build configurations are contained in the Docker compose file.
