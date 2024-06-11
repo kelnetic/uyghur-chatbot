@@ -24,7 +24,7 @@ TO DO
 """
 
 @app.get("/pdf_preview")
-def pdf_preview():
+def ingest_documents():
     file_name = "IF10281"
     reader = PdfReader("data/IF10281.pdf")
     pdf_content = ""
