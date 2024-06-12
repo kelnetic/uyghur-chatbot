@@ -1,16 +1,35 @@
 import os
+import json
+from pydantic import BaseModel
 from uuid import uuid4
 from fastapi import FastAPI
 from pypdf import PdfReader
 from canopy.tokenizer import Tokenizer
-from canopy.tokenizer.cohere import CohereAPITokenizer
+from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
-from canopy.knowledge_base.record_encoder.cohere import CohereRecordEncoder
+from canopy.knowledge_base.record_encoder import OpenAIRecordEncoder
 from canopy.models.data_models import Document, Query
+from canopy.context_engine import ContextEngine
+from canopy.chat_engine import ChatEngine
+from canopy.models.data_models import UserMessage
+from canopy.chat_engine.history_pruner import RecentHistoryPruner
 
 env = os.environ
 app = FastAPI()
-Tokenizer.initialize(tokenizer_class=CohereAPITokenizer, model_name="embed-multilingual-v3.0")
+Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
+
+encoder = OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
+kb = KnowledgeBase(
+    index_name=env.get("INDEX_NAME"),
+    record_encoder=encoder
+)
+kb.connect()
+kb.verify_index_connection()
+context_engine = ContextEngine(knowledge_base=kb)
+chat_engine = ChatEngine(context_engine=context_engine, history_pruner=RecentHistoryPruner(min_history_messages=1))
+
+class Message(BaseModel):
+    content: str
 
 """
 TO DO
@@ -23,10 +42,11 @@ TO DO
  - Could have a list of ingest files in a text file, then compare that with any new file. Continue it if already ingested
 """
 
-@app.get("/pdf_preview")
+@app.get("/ingest_documents")
 def ingest_documents():
-    file_name = "IF10281"
-    reader = PdfReader("data/IF10281.pdf")
+    #Can make it a post request with file path and metadata
+    file_name = "22-08-31-final-assesment"
+    reader = PdfReader("data/22-08-31-final-assesment.pdf")
     pdf_content = ""
     for page in reader.pages:
         pdf_content += page.extract_text()
@@ -40,39 +60,45 @@ def ingest_documents():
     host_file.write(pdf_content)
     host_file.close()
 
-    tokenizer = Tokenizer()
-    print(tokenizer.tokenize("Hello world!"))
-    encoder = CohereRecordEncoder(model_name=env.get("CO_KB_MODEL"))
+    with open(f'docker_loaded_data/{file_name}.txt', 'r') as file:
+        documents = [Document(id=str(uuid4()),
+                            text=file.read(),
+                            source="https://www.ohchr.org/sites/default/files/documents/countries/2022-08-31/22-08-31-final-assesment.pdf",
+                            metadata={
+                                "title": "OHCHR Assessment of human rights concerns in the Xinjiang Uyghur Autonomous Region, People's Republic of China",
+                                "primary_category": "report",
+                                "document_origin": "Office of the United Nations High Commissioner for Human Rights"
+                            })]
+        kb.upsert(documents)
+
+    return {"200 OK"}
+
+@app.post("/chat")
+def chat(message: Message):
+    response = chat_engine.chat(messages=[UserMessage(content=message.content)], stream=False)
+    content = response.choices[0].message.content
+    return {
+        "Query": message.content,
+        "Chat response": content
+        }
+
+@app.get("/")
+def root():
+    return {"message": "Hello World"}
+
+@app.get("/test")
+def test():
+    encoder = OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
     kb = KnowledgeBase(
         index_name=env.get("INDEX_NAME"),
         record_encoder=encoder
     )
     kb.connect()
     kb.verify_index_connection()
-
-    with open(f'docker_loaded_data/{file_name}.txt', 'r') as file:
-        documents = [Document(id=str(uuid4()),
-                            text=file.read(),
-                            source="https://crsreports.congress.gov/product/pdf/IF/IF10281",
-                            metadata={
-                                "title": "China Primer: Uyghurs",
-                                "primary_category": "brief",
-                                "doc_origin": "Congressional Research Service"
-                            })]
-        kb.upsert(documents)
-
-    results = kb.query([Query(text="Uyghur ethnic people"),
-                        Query(text="Uyghur ethnic people",
-                            top_k=10)])
-
-    print(results[0].documents[0].text)
-    # output: Arctic Monkeys are an English rock band formed in Sheffield in 2002.
-
-    print(f"score - {results[0].documents[0].score:.4f}")
-    # output: score - 0.8942
-
-    return {"PDF Content": pdf_content}
-
-@app.get("/")
-def root():
-    return {"message": "Hello World"}
+    results = kb.query([Query(text="Who are the Uyghurs?")])
+    context_engine = ContextEngine(knowledge_base=kb)
+    # print(message)
+    results = context_engine.query([Query(text="Who are the Uyghurs?")], max_context_tokens=2867)
+    print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
+    print(f"\n# tokens in context returned: {results.num_tokens}")
+    return {"results": results}

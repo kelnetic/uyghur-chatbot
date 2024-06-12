@@ -1,4 +1,5 @@
 fastapi
 uvicorn
-canopy-sdk[cohere]
+pydantic
+https://github.com/kelnetic/canopy/archive/main.zip
 pypdf
