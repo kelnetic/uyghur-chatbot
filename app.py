@@ -1,82 +1,116 @@
 import os
 import json
-from pydantic import BaseModel
+import time
+import random
 from uuid import uuid4
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pypdf import PdfReader
-from canopy.tokenizer import Tokenizer
-from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
 from canopy.knowledge_base.record_encoder import OpenAIRecordEncoder
 from canopy.models.data_models import Document, Query
 from canopy.context_engine import ContextEngine
-from canopy.chat_engine import ChatEngine
 from canopy.models.data_models import UserMessage
-from canopy.chat_engine.history_pruner import RecentHistoryPruner
+from models import Message, Dataset
+from dependencies import (
+    get_kb,
+    get_context_engine,
+    get_chat_engine,
+    get_index
+)
 
 env = os.environ
 app = FastAPI()
-Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
-
-encoder = OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
-kb = KnowledgeBase(
-    index_name=env.get("INDEX_NAME"),
-    record_encoder=encoder
-)
-kb.connect()
-kb.verify_index_connection()
-context_engine = ContextEngine(knowledge_base=kb)
-chat_engine = ChatEngine(context_engine=context_engine, history_pruner=RecentHistoryPruner(min_history_messages=1))
-
-class Message(BaseModel):
-    content: str
+kb = get_kb()
+#For retrieving context in a separate endpoint
+context_engine = get_context_engine(kb=kb)
+chat_engine = get_chat_engine(context_engine=context_engine)
+index = get_index()
 
 """
 TO DO
- - If extension is PDF, need to just extract the text from it
- - If there is a file, remove it and replace it 
- - Extract it to data_text folder
- - Then create the endpoint for upload docs
- - Then go through the canopy set up
- - Install the canopy-sdk
- - Could have a list of ingest files in a text file, then compare that with any new file. Continue it if already ingested
+ - Maybe have a logging function that outputs to a txt file? that uploads to s3
 """
 
-@app.get("/ingest_documents")
-def ingest_documents():
-    #Can make it a post request with file path and metadata
-    file_name = "22-08-31-final-assesment"
-    reader = PdfReader("data/22-08-31-final-assesment.pdf")
+@app.post("/ingest")
+def ingest_documents(dataset: Dataset):
+    file_path = dataset.file_path
+    source_link = dataset.source_link
+    title = dataset.title
+    category = dataset.primary_category
+    origin = dataset.document_origin
+
+    #Make a query to see if the document already exists in the vector DB
+    query = {
+        "source": source_link,
+        "title": title,
+        "primary_category": category,
+        "document_origin": origin
+    }
+    results = index.query(
+        vector=[0] * 1536,
+        filter=query,
+        top_k=1
+    )
+    if results["matches"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The document with the provided metadata already exists"
+        )
+
+    #Reads a PDF and extracts the text
+    reader = PdfReader(file_path)
     pdf_content = ""
     for page in reader.pages:
         pdf_content += page.extract_text()
+    file_name = file_path.split("/")[-1].split(".")[0]
 
+    #Writes the text to a file in the Docker image
     docker_file = open(f"docker_loaded_data/{file_name}.txt", "w")
     docker_file.write(pdf_content)
     docker_file.close()
-    
+
     # Writing the file to the host if verification is needed
     host_file = open(f"data_text/{file_name}.txt", "w")
     host_file.write(pdf_content)
     host_file.close()
 
+    #Opens the text file, upserts it, then removes it from the Docker image
+    id = str(uuid4())
     with open(f'docker_loaded_data/{file_name}.txt', 'r') as file:
-        documents = [Document(id=str(uuid4()),
+        documents = [Document(id=id,
                             text=file.read(),
-                            source="https://www.ohchr.org/sites/default/files/documents/countries/2022-08-31/22-08-31-final-assesment.pdf",
+                            source=source_link,
                             metadata={
-                                "title": "OHCHR Assessment of human rights concerns in the Xinjiang Uyghur Autonomous Region, People's Republic of China",
-                                "primary_category": "report",
-                                "document_origin": "Office of the United Nations High Commissioner for Human Rights"
+                                "title": title,
+                                "primary_category": category,
+                                "document_origin": origin,
+                                "file_name": file_name
                             })]
         kb.upsert(documents)
+    os.remove(f'docker_loaded_data/{file_name}.txt')
 
-    return {"200 OK"}
+    # Checks if the file has been uploaded with backoff
+    retry_delay = 1  # Initial delay in seconds
+    for attempt in range(5):
+        result = index.fetch([f"{id}_0"])
+        if not result['vectors']:
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Double the delay for the next attempt
+            retry_delay += random.uniform(0, 1)  # Add jitter
+        else:
+            return {f"The document with id {id} was successfully upserted"}
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"The document with id {id} was upserted but not fetched, please verify on Pinecone"
+    )
 
 @app.post("/chat")
 def chat(message: Message):
     response = chat_engine.chat(messages=[UserMessage(content=message.content)], stream=False)
     content = response.choices[0].message.content
+    #TO DO: Go through the context, and return the source, title, and document origin
+    print("completed chat")
     return {
         "Query": message.content,
         "Chat response": content
@@ -96,9 +130,40 @@ def test():
     kb.connect()
     kb.verify_index_connection()
     results = kb.query([Query(text="Who are the Uyghurs?")])
+    # results = kb.query([Query(text="uyghur", top_k=1, metadata_filter={"document_id": "fd5e0fcb-72bb-43ee-bf1d-44b389f632c4"})])
+    # print(results)
+    # index = pc.Index(env.get("INDEX_NAME"))
+    # query = {"document_id":"fd5e0fcb-72bb-43ee-bf1d-44b389f632c4"}
+    # results = index.query(
+    #     id="fd5e0fcb-72bb-43ee-bf1d-44b389f632c4",
+    #     # filter=query,
+    #     top_k=1,
+    #     include_metadata=True,
+    # )
+    print(results)
+    # CAN DO: index.fetch(["UUIDHERE_0"]) much faster, index with ['vectors']
+    # context_engine = ContextEngine(knowledge_base=kb)
+    # # print(message)
+    # results = context_engine.query([Query(text="Who are the Uyghurs?")], max_context_tokens=2867)
+    # print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
+    # print(f"\n# tokens in context returned: {results.num_tokens}")
+    print("completed kb test")
+    return {"results": results}
+
+@app.get("/test2")
+def test2():
+    encoder = OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
+    kb = KnowledgeBase(
+        index_name=env.get("INDEX_NAME"),
+        record_encoder=encoder
+    )
+    kb.connect()
+    kb.verify_index_connection()
+    # results = kb.query([Query(text="Who are the Uyghurs?")])
+    # CAN DO: index.fetch(["UUIDHERE_0"]) much faster, index with ['vectors']
     context_engine = ContextEngine(knowledge_base=kb)
-    # print(message)
     results = context_engine.query([Query(text="Who are the Uyghurs?")], max_context_tokens=2867)
-    print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
-    print(f"\n# tokens in context returned: {results.num_tokens}")
+    # print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
+    # print(f"\n# tokens in context returned: {results.num_tokens}")
+    print("completed kb test")
     return {"results": results}

@@ -2,4 +2,5 @@ fastapi
 uvicorn
 pydantic
 https://github.com/kelnetic/canopy/archive/main.zip
+pinecone-client[grpc]
 pypdf
