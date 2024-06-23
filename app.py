@@ -12,6 +12,7 @@ from canopy.context_engine import ContextEngine
 from canopy.models.data_models import UserMessage
 from models import Message, Dataset
 from dependencies import (
+    get_system_prompt,
     get_kb,
     get_context_engine,
     get_chat_engine,
@@ -20,6 +21,7 @@ from dependencies import (
 
 env = os.environ
 app = FastAPI()
+system_prompt = get_system_prompt()
 kb = get_kb()
 #For retrieving context in a separate endpoint
 context_engine = get_context_engine(kb=kb)
@@ -109,11 +111,30 @@ def ingest_documents(dataset: Dataset):
 def chat(message: Message):
     response = chat_engine.chat(messages=[UserMessage(content=message.content)], stream=False)
     content = response.choices[0].message.content
-    #TO DO: Go through the context, and return the source, title, and document origin
-    print("completed chat")
+    context_values = set()
+    context = []
+    for query in response.context['content']:
+        for snippet in query['snippets']:
+            values = (
+                snippet['source'],
+                snippet['metadata']['document_origin'],
+                snippet['metadata']['primary_category'],
+                snippet['metadata']['title']
+            )
+            if values in context_values:
+                continue
+            context_values.add(values)
+            values_list = list(values)
+            context_item = {}
+            context_item['source'] = values_list.pop(0)
+            context_item['document_origin'] = values_list.pop(0)
+            context_item['primary_category'] = values_list.pop(0)
+            context_item['title'] = values_list.pop(0)
+            context.append(context_item)
+
     return {
-        "Query": message.content,
-        "Chat response": content
+        "response": content,
+        "context": context
         }
 
 @app.get("/")

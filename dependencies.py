@@ -1,4 +1,5 @@
 import os
+import yaml
 from canopy.tokenizer import Tokenizer
 from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
@@ -10,6 +11,11 @@ from pinecone.grpc import PineconeGRPC as Pinecone
 
 env = os.environ
 Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
+
+def get_system_prompt():
+    with open("canopy_config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    return config["system_prompt"]
 
 def get_encoder():
     return OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
@@ -29,7 +35,8 @@ def get_context_engine(kb=get_kb()):
 def get_chat_engine(context_engine=get_context_engine()):
     chat_engine = ChatEngine(
         context_engine=context_engine,
-        history_pruner=RecentHistoryPruner(min_history_messages=1)
+        history_pruner=RecentHistoryPruner(min_history_messages=1),
+        system_prompt=get_system_prompt()
     )
     return chat_engine
 
