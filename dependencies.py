@@ -1,5 +1,6 @@
 import os
 import yaml
+import boto3
 from canopy.tokenizer import Tokenizer
 from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
@@ -44,3 +45,11 @@ def get_index():
     pc = Pinecone(api_key=env.get("PINECONE_API_KEY"))
     index = pc.Index(env.get("INDEX_NAME"))
     return index
+
+def get_s3_client():
+    return boto3.client(
+        "s3",
+        aws_access_key_id=env.get("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=env.get("AWS_SECRET_ACCESS_KEY"),
+        region_name=env.get("AWS_REGION")
+    )

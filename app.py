@@ -3,6 +3,7 @@ import json
 import time
 import random
 from uuid import uuid4
+from io import BytesIO
 from fastapi import FastAPI, HTTPException
 from pypdf import PdfReader
 from canopy.knowledge_base import KnowledgeBase
@@ -16,7 +17,8 @@ from dependencies import (
     get_kb,
     get_context_engine,
     get_chat_engine,
-    get_index
+    get_index,
+    get_s3_client
 )
 
 env = os.environ
@@ -27,6 +29,7 @@ kb = get_kb()
 context_engine = get_context_engine(kb=kb)
 chat_engine = get_chat_engine(context_engine=context_engine)
 index = get_index()
+s3_client = get_s3_client()
 
 """
 TO DO
@@ -35,18 +38,20 @@ TO DO
 
 @app.post("/ingest")
 def ingest_documents(dataset: Dataset):
-    file_path = dataset.file_path
+    file_name = dataset.file_name
     source_link = dataset.source_link
     title = dataset.title
     category = dataset.primary_category
     origin = dataset.document_origin
+    publication_date = str(dataset.publication_date) if dataset.publication_date is not None else ""
 
     #Make a query to see if the document already exists in the vector DB
     query = {
         "source": source_link,
         "title": title,
         "primary_category": category,
-        "document_origin": origin
+        "document_origin": origin,
+        "publication_date": publication_date
     }
     results = index.query(
         vector=[0] * 1536,
@@ -59,47 +64,48 @@ def ingest_documents(dataset: Dataset):
             detail=f"The document with the provided metadata already exists"
         )
 
-    #Reads a PDF and extracts the text
-    reader = PdfReader(file_path)
+    #Reads a PDF from S3 and extracts the text
+    pdf_obj = s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
+    reader = PdfReader(BytesIO(pdf_obj["Body"].read()))
     pdf_content = ""
     for page in reader.pages:
         pdf_content += page.extract_text()
-    file_name = file_path.split("/")[-1].split(".")[0]
+    file_stem = file_name.split(".")[0]
 
     #Writes the text to a file in the Docker image
-    docker_file = open(f"docker_loaded_data/{file_name}.txt", "w")
+    docker_file = open(f"docker_loaded_data/{file_stem}.txt", "w")
     docker_file.write(pdf_content)
     docker_file.close()
 
-    # Writing the file to the host if verification is needed
-    host_file = open(f"data_text/{file_name}.txt", "w")
-    host_file.write(pdf_content)
-    host_file.close()
-
     #Opens the text file, upserts it, then removes it from the Docker image
     id = str(uuid4())
-    with open(f'docker_loaded_data/{file_name}.txt', 'r') as file:
+    with open(f'docker_loaded_data/{file_stem}.txt', 'r') as file:
         documents = [Document(id=id,
-                            text=file.read(),
-                            source=source_link,
-                            metadata={
-                                "title": title,
-                                "primary_category": category,
-                                "document_origin": origin,
-                                "file_name": file_name
-                            })]
+                        text=file.read(),
+                        source=source_link,
+                        metadata={
+                            "title": title,
+                            "primary_category": category,
+                            "document_origin": origin,
+                            "file_name": file_name,
+                            "publication_date": publication_date
+                        })]
         kb.upsert(documents)
-    os.remove(f'docker_loaded_data/{file_name}.txt')
+    os.remove(f'docker_loaded_data/{file_stem}.txt')
 
     # Checks if the file has been uploaded with backoff
     retry_delay = 1  # Initial delay in seconds
-    for attempt in range(5):
+    for _ in range(5):
         result = index.fetch([f"{id}_0"])
         if not result['vectors']:
             time.sleep(retry_delay)
             retry_delay *= 2  # Double the delay for the next attempt
             retry_delay += random.uniform(0, 1)  # Add jitter
+        # Upon successful upsert, "move" the file to the uploaded bucket
         else:
+            copy_source = {'Bucket': env.get("LOADING_BUCKET"), 'Key': file_name}
+            s3_client.copy(copy_source, env.get("UPLOADED_BUCKET"), file_name)
+            s3_client.delete_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
             return {f"The document with id {id} was successfully upserted"}
 
     raise HTTPException(
@@ -132,10 +138,7 @@ def chat(message: Message):
             context_item['title'] = values_list.pop(0)
             context.append(context_item)
 
-    return {
-        "response": content,
-        "context": context
-        }
+    return {"response": content, "context": context}
 
 @app.get("/")
 def root():
@@ -188,3 +191,7 @@ def test2():
     # print(f"\n# tokens in context returned: {results.num_tokens}")
     print("completed kb test")
     return {"results": results}
+
+@app.get("/test3")
+def test3():
+    s3_client
