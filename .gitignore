@@ -1,5 +1,8 @@
 # Environments
 .env
 
-#DS_Store
+# DS_Store
 .DS_Store
+
+# Ruff
+.ruff_cache

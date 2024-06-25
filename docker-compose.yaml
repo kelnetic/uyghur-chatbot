@@ -7,7 +7,5 @@ services:
       dockerfile: Dockerfile
     ports:
       - "7860:7860"
-    volumes:
-      - ./data_text:/data_text
     env_file:
       - .env

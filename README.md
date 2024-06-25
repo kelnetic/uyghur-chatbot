@@ -9,3 +9,17 @@ The current plans are to:
 
 ## How to run the server locally:
 - Run `docker compose up --build`. The build configurations are contained in the Docker compose file.
+
+## Canopy tips:
+If you want to view results from the knowledge base you can do the following:
+```
+results = kb.query([Query(text="uyghur", top_k=1, metadata_filter={"document_id": "fd5e0fcb-72bb-43ee-bf1d-44b389f632c4"})])
+print(results)
+```
+If you want to view results from the context engine you can do the following:
+```
+context_engine = ContextEngine(knowledge_base=kb)
+results = context_engine.query([Query(text="Who are the Uyghurs?")], max_context_tokens=2867)
+print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
+print(f"\n# tokens in context returned: {results.num_tokens}")
+```
