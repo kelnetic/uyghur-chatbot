@@ -13,6 +13,14 @@ from pinecone.grpc import PineconeGRPC as Pinecone
 env = os.environ
 Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
 
+class AppManager:
+    def __init__(self):
+        self.kb = get_kb()
+        self.context_engine = get_context_engine(kb=self.kb)
+        self.chat_engine = get_chat_engine(context_engine=self.context_engine)
+        self.index = get_index()
+        self.s3_client = get_s3_client()
+
 def get_system_prompt():
     with open("canopy_config.yaml", "r") as f:
         config = yaml.safe_load(f)

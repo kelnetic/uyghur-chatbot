@@ -8,7 +8,10 @@ class Message(BaseModel):
 
 class CategoryTypes(str, Enum):
     REPORT = "Report",
-    TESTIMONY = "Testimony"
+    BRIEF = "Brief",
+    TESTIMONY = "Testimony",
+    RESEARCH = "Research",
+    NEWS = "News"
 
 class Dataset(BaseModel):
     file_name: str

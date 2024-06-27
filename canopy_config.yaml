@@ -9,10 +9,11 @@
 # Note: line breaks in the prompts are important, and may affect the LLM's behavior
 # ---------------------------------------------------------------------------------
 system_prompt: &system_prompt |
-  Use the following pieces of context to answer the user question at the next messages. This context retrieved from a knowledge database and you should use only the facts from the context to answer. Do NOT provide any sources in an answer.
-  If you don't know the answer, just say that you don't know, don't try to make up an answer, use the context.
+  Use the following pieces of context to answer the user question at the next message. This context retrieved from a knowledge database and you should use only the facts from the context to answer.
+  When generating an answer, meticulously provide as much detail as possible, qualitative and quantitative, that is relevant to the user question, and never shorter than 250 words. Do NOT provide any sources in an answer.
   Don't address the context directly, but use it to answer the user question like it's your own knowledge.
   If the user asks for more details or clarification, provide an answer that has multiple paragraphs.
+  If you don't know the answer, say 'Sorry, I'm unable to help you with that', don't try to make up an answer, use the context.
 query_builder_prompt: &query_builder_prompt |
   Your task is to formulate search queries for a search engine, to assist in responding to the user's question.
   You should break down complex questions into sub-queries if needed.

@@ -7,24 +7,12 @@ from fastapi import FastAPI, HTTPException
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
 from pypdf import PdfReader
-from dependencies import (
-    get_system_prompt,
-    get_kb,
-    get_context_engine,
-    get_chat_engine,
-    get_index,
-    get_s3_client
-)
+from dependencies import DependencyManager
 
 env = os.environ
 app = FastAPI()
-system_prompt = get_system_prompt()
-kb = get_kb()
-#For retrieving context in a separate endpoint
-context_engine = get_context_engine(kb=kb)
-chat_engine = get_chat_engine(context_engine=context_engine)
-index = get_index()
-s3_client = get_s3_client()
+#UyghurChatbot Core
+uc_core = DependencyManager()
 
 """
 TODO
@@ -50,7 +38,7 @@ def ingest_documents(dataset: Dataset):
         "document_origin": origin,
         "publication_date": publication_date
     }
-    results = index.query(
+    results = uc_core.index.query(
         vector=[0] * 1536,
         filter=query,
         top_k=1
@@ -62,7 +50,7 @@ def ingest_documents(dataset: Dataset):
         )
 
     #Reads a PDF from S3 and extracts the text
-    pdf_obj = s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
+    pdf_obj = uc_core.s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
     reader = PdfReader(BytesIO(pdf_obj["Body"].read()))
     pdf_content = ""
     for page in reader.pages:
@@ -87,13 +75,13 @@ def ingest_documents(dataset: Dataset):
                             "file_name": file_name,
                             "publication_date": publication_date
                         })]
-        kb.upsert(documents)
+        uc_core.kb.upsert(documents)
     os.remove(f'tmp/docker_loaded_data/{file_stem}.txt')
 
     # Checks if the file has been uploaded with backoff
     retry_delay = 1
     for _ in range(5):
-        result = index.fetch([f"{id}_0"])
+        result = uc_core.index.fetch([f"{id}_0"])
         if not result['vectors']:
             time.sleep(retry_delay)
             retry_delay *= 2
@@ -101,8 +89,8 @@ def ingest_documents(dataset: Dataset):
         # Upon successful upsert, "move" the file to the uploaded bucket
         else:
             copy_source = {'Bucket': env.get("LOADING_BUCKET"), 'Key': file_name}
-            s3_client.copy(copy_source, env.get("UPLOADED_BUCKET"), file_name)
-            s3_client.delete_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
+            uc_core.s3_client.copy(copy_source, env.get("UPLOADED_BUCKET"), file_name)
+            uc_core.s3_client.delete_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
             return {f"The document with id {id} was successfully upserted"}
 
     raise HTTPException(
@@ -112,8 +100,10 @@ def ingest_documents(dataset: Dataset):
 
 @app.post("/chat")
 def chat(message: Message):
-    response = chat_engine.chat(messages=[UserMessage(content=message.content)], stream=False)
+    response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
+    #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
+    #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
     content = response.choices[0].message.content
     context_values = set()
     context = []
@@ -127,8 +117,9 @@ def chat(message: Message):
                 "primary_category": snippet['metadata']['primary_category'],
                 "publication_date": snippet['metadata']['publication_date']
             }
-            if tuple(context_item.values()) not in context_values:
-                context_values.add(tuple(context_item.values()))
+            context_values_tuple = tuple(context_item.values())
+            if context_values_tuple not in context_values:
+                context_values.add(context_values_tuple)
                 context.append(context_item)
 
     return {"response": content, "context": context}
@@ -136,3 +127,10 @@ def chat(message: Message):
 @app.get("/")
 def root():
     return {"message": "Hello World"}
+
+@app.post("/test")
+def test(message: Message):
+    response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
+    #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
+    #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
+    return response
