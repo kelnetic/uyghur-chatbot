@@ -1,6 +1,7 @@
 import os
 import yaml
 import boto3
+from fastapi import HTTPException, status
 from canopy.tokenizer import Tokenizer
 from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
@@ -13,7 +14,7 @@ from pinecone.grpc import PineconeGRPC as Pinecone
 env = os.environ
 Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
 
-class DependencyManager:
+class AppManager:
     def __init__(self):
         self.kb = get_kb()
         self.context_engine = get_context_engine(kb=self.kb)
@@ -61,3 +62,10 @@ def get_s3_client():
         aws_secret_access_key=env.get("AWS_SECRET_ACCESS_KEY"),
         region_name=env.get("AWS_REGION")
     )
+
+def check_app_mode():
+    if env.get("APP_MODE") != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This operation is forbidden"
+        )

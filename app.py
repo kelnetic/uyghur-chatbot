@@ -3,16 +3,21 @@ import time
 import random
 from uuid import uuid4
 from io import BytesIO
-from fastapi import FastAPI, HTTPException
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    status,
+    Depends
+)
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
 from pypdf import PdfReader
-from dependencies import DependencyManager
+from utils import AppManager, check_app_mode
 
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
-uc_core = DependencyManager()
+uc_core = AppManager()
 
 """
 TODO
@@ -21,7 +26,7 @@ TODO
  - But we could hardcode East Turkestan to always appear before Xinjiang
 """
 
-@app.post("/ingest")
+@app.post("/ingest", dependencies=[Depends(check_app_mode)])
 def ingest_documents(dataset: Dataset):
     file_name = dataset.file_name
     source_link = dataset.source_link
@@ -45,7 +50,7 @@ def ingest_documents(dataset: Dataset):
     )
     if results["matches"]:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="The document with the provided metadata already exists"
         )
 
@@ -94,7 +99,7 @@ def ingest_documents(dataset: Dataset):
             return {f"The document with id {id} was successfully upserted"}
 
     raise HTTPException(
-        status_code=404,
+        status_code=status.HTTP_404_NOT_FOUND,
         detail=f"The document with id {id} was upserted but not fetched, please verify on Pinecone"
     )
 
