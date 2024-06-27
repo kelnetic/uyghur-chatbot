@@ -29,19 +29,16 @@ TODO
 @app.post("/ingest", dependencies=[Depends(check_app_mode)])
 def ingest_documents(dataset: Dataset):
     file_name = dataset.file_name
-    source_link = dataset.source_link
-    title = dataset.title
-    category = dataset.primary_category
-    origin = dataset.document_origin
-    publication_date = str(dataset.publication_date) if dataset.publication_date is not None else ""
-
-    #Make a query to see if the document already exists in the vector DB
+    #Make a query to see if the document already exists in the vector DB, can be re-used when upserted
     query = {
-        "source": source_link,
-        "title": title,
-        "primary_category": category,
-        "document_origin": origin,
-        "publication_date": publication_date
+        "file_name": file_name,
+        "source": dataset.source_link,
+        "title": dataset.title,
+        "primary_category": dataset.primary_category,
+        "document_origin": dataset.document_origin,
+        "publication_year": str(dataset.publication_year),
+        "publication_month": str(dataset.publication_month),
+        "publication_day": str(dataset.publication_day) if dataset.publication_day else ""
     }
     results = uc_core.index.query(
         vector=[0] * 1536,
@@ -72,14 +69,9 @@ def ingest_documents(dataset: Dataset):
     with open(f'tmp/docker_loaded_data/{file_stem}.txt', 'r') as file:
         documents = [Document(id=id,
                         text=file.read(),
-                        source=source_link,
-                        metadata={
-                            "title": title,
-                            "primary_category": category,
-                            "document_origin": origin,
-                            "file_name": file_name,
-                            "publication_date": publication_date
-                        })]
+                        source=query.pop("source"),
+                        metadata=query
+                        )]
         uc_core.kb.upsert(documents)
     os.remove(f'tmp/docker_loaded_data/{file_stem}.txt')
 
