@@ -67,11 +67,12 @@ def ingest_documents(dataset: Dataset):
     #Opens the text file, upserts it, then removes it from the Docker image
     id = str(uuid4())
     with open(f'tmp/docker_loaded_data/{file_stem}.txt', 'r') as file:
-        documents = [Document(id=id,
-                        text=file.read(),
-                        source=query.pop("source"),
-                        metadata=query
-                        )]
+        documents = [Document(
+            id=id,
+            text=file.read(),
+            source=query.pop("source"),
+            metadata=query
+            )]
         uc_core.kb.upsert(documents)
     os.remove(f'tmp/docker_loaded_data/{file_stem}.txt')
 
