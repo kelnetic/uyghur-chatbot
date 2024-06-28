@@ -24,6 +24,8 @@ TODO
  - Maybe have a logging function that outputs to a txt file? that uploads to s3
  - Guarantee that the chatbot will confirm the existence of a chatbot as well as East Turkestan, whenever Xinjiang is mentioned
  - But we could hardcode East Turkestan to always appear before Xinjiang
+ - Need to test:
+ -- New upserting, if it all works. If publication day will store both int or string
 """
 
 @app.post("/ingest", dependencies=[Depends(check_app_mode)])
@@ -36,9 +38,9 @@ def ingest_documents(dataset: Dataset):
         "title": dataset.title,
         "primary_category": dataset.primary_category,
         "document_origin": dataset.document_origin,
-        "publication_year": str(dataset.publication_year),
-        "publication_month": str(dataset.publication_month),
-        "publication_day": str(dataset.publication_day) if dataset.publication_day else ""
+        "publication_year": dataset.publication_year,
+        "publication_month": dataset.publication_month,
+        "publication_day": dataset.publication_day if dataset.publication_day else ""
     }
     results = uc_core.index.query(
         vector=[0] * 1536,
@@ -57,24 +59,16 @@ def ingest_documents(dataset: Dataset):
     pdf_content = ""
     for page in reader.pages:
         pdf_content += page.extract_text()
-    file_stem = file_name.split(".")[0]
 
-    #Writes the text to a file in the Docker image
-    docker_file = open(f"tmp/docker_loaded_data/{file_stem}.txt", "w")
-    docker_file.write(pdf_content)
-    docker_file.close()
-
-    #Opens the text file, upserts it, then removes it from the Docker image
+    #Upserts the content that was extracted
     id = str(uuid4())
-    with open(f'tmp/docker_loaded_data/{file_stem}.txt', 'r') as file:
-        documents = [Document(
-            id=id,
-            text=file.read(),
-            source=query.pop("source"),
-            metadata=query
-            )]
-        uc_core.kb.upsert(documents)
-    os.remove(f'tmp/docker_loaded_data/{file_stem}.txt')
+    documents = [Document(
+        id=id,
+        text=pdf_content,
+        source=query.pop("source"),
+        metadata=query
+        )]
+    uc_core.kb.upsert(documents)
 
     # Checks if the file has been uploaded with backoff
     retry_delay = 1
@@ -113,7 +107,9 @@ def chat(message: Message):
                 "title": snippet['metadata']['title'],
                 "document_origin": snippet['metadata']['document_origin'],
                 "primary_category": snippet['metadata']['primary_category'],
-                "publication_date": snippet['metadata']['publication_date']
+                "publication_year": snippet['metadata']['publication_year'],
+                "publication_month": snippet['metadata']['publication_month'],
+                "publication_day": snippet['metadata']['publication_day']
             }
             context_values_tuple = tuple(context_item.values())
             if context_values_tuple not in context_values:
@@ -129,6 +125,4 @@ def root():
 @app.post("/test")
 def test(message: Message):
     response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
-    #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
-    #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
     return response
