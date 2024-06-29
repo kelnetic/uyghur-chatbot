@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 pydantic
-https://github.com/kelnetic/canopy/archive/main.zip
+canopy-sdk[cohere] @ https://github.com/kelnetic/canopy/archive/main.zip
 pinecone-client[grpc]
 pypdf
 boto3

@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from canopy.tokenizer import Tokenizer
 from canopy.tokenizer.openai import OpenAITokenizer
 from canopy.knowledge_base import KnowledgeBase
+from canopy.knowledge_base.reranker import CohereReranker
 from canopy.knowledge_base.record_encoder import OpenAIRecordEncoder
 from canopy.context_engine import ContextEngine
 from canopy.chat_engine import ChatEngine
@@ -30,10 +31,19 @@ def get_system_prompt():
 def get_encoder():
     return OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
 
+def get_cohere_reranker():
+    return CohereReranker(
+        model_name = env.get("RERANKING_MODEL"),
+        n_results = 5,
+        api_key = env.get("CO_API_KEY")
+    )
+
 def get_kb():
     kb = KnowledgeBase(
         index_name=env.get("INDEX_NAME"),
-        record_encoder=get_encoder()
+        record_encoder=get_encoder(),
+        default_top_k=int(env.get("DEFAULT_TOP_K")),
+        reranker=get_cohere_reranker()
     )
     kb.connect()
     kb.verify_index_connection()

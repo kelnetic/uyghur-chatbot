@@ -11,7 +11,8 @@ class CategoryTypes(str, Enum):
     BRIEF = "Brief",
     TESTIMONY = "Testimony",
     RESEARCH = "Research",
-    NEWS = "News"
+    NEWS = "News",
+    ANALYSIS = "Analysis"
 
 class Dataset(BaseModel):
     file_name: str

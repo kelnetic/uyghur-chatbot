@@ -24,8 +24,6 @@ TODO
  - Maybe have a logging function that outputs to a txt file? that uploads to s3
  - Guarantee that the chatbot will confirm the existence of a chatbot as well as East Turkestan, whenever Xinjiang is mentioned
  - But we could hardcode East Turkestan to always appear before Xinjiang
- - Need to test:
- -- New upserting, if it all works. If publication day will store both int or string
 """
 
 @app.post("/ingest", dependencies=[Depends(check_app_mode)])
@@ -40,8 +38,11 @@ def ingest_documents(dataset: Dataset):
         "document_origin": dataset.document_origin,
         "publication_year": dataset.publication_year,
         "publication_month": dataset.publication_month,
-        "publication_day": dataset.publication_day if dataset.publication_day else ""
     }
+    #Some sources may not have a publication day
+    if dataset.publication_day:
+        query["publication_day"] = dataset.publication_day
+
     results = uc_core.index.query(
         vector=[0] * 1536,
         filter=query,
@@ -54,21 +55,27 @@ def ingest_documents(dataset: Dataset):
         )
 
     #Reads a PDF from S3 and extracts the text
-    pdf_obj = uc_core.s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
-    reader = PdfReader(BytesIO(pdf_obj["Body"].read()))
-    pdf_content = ""
-    for page in reader.pages:
-        pdf_content += page.extract_text()
+    try:
+        pdf_obj = uc_core.s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
+        reader = PdfReader(BytesIO(pdf_obj["Body"].read()))
+        pdf_content = ""
+        for page in reader.pages:
+            pdf_content += page.extract_text()
 
-    #Upserts the content that was extracted
-    id = str(uuid4())
-    documents = [Document(
-        id=id,
-        text=pdf_content,
-        source=query.pop("source"),
-        metadata=query
-        )]
-    uc_core.kb.upsert(documents)
+        #Upserts the content that was extracted
+        id = str(uuid4())
+        documents = [Document(
+            id=id,
+            text=pdf_content,
+            source=query.pop("source"),
+            metadata=query
+            )]
+        uc_core.kb.upsert(documents)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error with extracting or upserting text: {error}"
+        )
 
     # Checks if the file has been uploaded with backoff
     retry_delay = 1
@@ -107,10 +114,12 @@ def chat(message: Message):
                 "title": snippet['metadata']['title'],
                 "document_origin": snippet['metadata']['document_origin'],
                 "primary_category": snippet['metadata']['primary_category'],
-                "publication_year": snippet['metadata']['publication_year'],
-                "publication_month": snippet['metadata']['publication_month'],
-                "publication_day": snippet['metadata']['publication_day']
+                "publication_year": int(snippet['metadata']['publication_year']),
+                "publication_month": int(snippet['metadata']['publication_month']),
             }
+            if snippet['metadata'].get('publication_month'):
+                context_item["publication_day"] = int(snippet['metadata']['publication_day'])
+
             context_values_tuple = tuple(context_item.values())
             if context_values_tuple not in context_values:
                 context_values.add(context_values_tuple)
@@ -118,11 +127,8 @@ def chat(message: Message):
 
     return {"response": content, "context": context}
 
-@app.get("/")
-def root():
-    return {"message": "Hello World"}
-
 @app.post("/test")
 def test(message: Message):
     response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
+    # results = uc_core.kb.query([Query(text=message.content)])
     return response
