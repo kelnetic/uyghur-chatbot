@@ -7,7 +7,8 @@ from fastapi import (
     FastAPI,
     HTTPException,
     status,
-    Depends
+    Depends,
+    Request
 )
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
@@ -98,11 +99,12 @@ def ingest_documents(dataset: Dataset):
     )
 
 @app.post("/chat")
-def chat(message: Message):
+def chat(message: Message, request: Request):
     response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
     #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
     #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
+    print(f"Printing request headers: {request.headers}")
     content = response.choices[0].message.content
     context_values = set()
     context = []
@@ -126,9 +128,3 @@ def chat(message: Message):
                 context.append(context_item)
 
     return {"response": content, "context": context}
-
-@app.post("/test")
-def test(message: Message):
-    # response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
-    # results = uc_core.kb.query([Query(text=message.content)])
-    return message
