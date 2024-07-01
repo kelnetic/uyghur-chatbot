@@ -11,6 +11,7 @@ from canopy.knowledge_base.record_encoder import OpenAIRecordEncoder
 from canopy.context_engine import ContextEngine
 from canopy.chat_engine import ChatEngine
 from canopy.chat_engine.history_pruner import RecentHistoryPruner
+from canopy.llm import OpenAILLM
 from pinecone.grpc import PineconeGRPC as Pinecone
 
 load_dotenv(find_dotenv())
@@ -31,7 +32,10 @@ def get_system_prompt():
     return config["system_prompt"]
 
 def get_encoder():
-    return OpenAIRecordEncoder(model_name=env.get("EMBEDDING_MODEL"))
+    return OpenAIRecordEncoder(
+        model_name=env.get("EMBEDDING_MODEL"),
+        api_key=env.get("OPENAI_API_KEY")
+        )
 
 def get_cohere_reranker():
     return CohereReranker(
@@ -58,7 +62,8 @@ def get_chat_engine(context_engine=get_context_engine()):
     chat_engine = ChatEngine(
         context_engine=context_engine,
         history_pruner=RecentHistoryPruner(min_history_messages=1),
-        system_prompt=get_system_prompt()
+        system_prompt=get_system_prompt(),
+        llm = OpenAILLM(api_key=env.get("OPENAI_API_KEY"))
     )
     return chat_engine
 
