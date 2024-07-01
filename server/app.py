@@ -8,14 +8,17 @@ print("Files and directories in '", path, "' :")
 print(dir_list)
 
 # Get the list of all files and directories
-path = "/"
+path = "/etc/secrets"
 dir_list = os.listdir(path)
 print("Files and directories in '", path, "' :")
 # prints all files
 print(dir_list)
 
-APP_ROOT = os.path.join(os.path.dirname(__file__))
-print("Files and directories in '", APP_ROOT, "' :")
+
+# Get the list of all files and directories
+path = "/"
+dir_list = os.listdir(path)
+print("Files and directories in '", path, "' :")
 # prints all files
 print(dir_list)
 
