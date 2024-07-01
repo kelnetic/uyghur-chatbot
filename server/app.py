@@ -1,33 +1,9 @@
 import os
-
-# Get the list of all files and directories
-path = "/etc"
-dir_list = os.listdir(path)
-print("Files and directories in '", path, "' :")
-# prints all files
-print(dir_list)
-
-# Get the list of all files and directories
-path = "/etc/secrets"
-dir_list = os.listdir(path)
-print("Files and directories in '", path, "' :")
-# prints all files
-print(dir_list)
-
-
-# Get the list of all files and directories
-path = "/"
-dir_list = os.listdir(path)
-print("Files and directories in '", path, "' :")
-# prints all files
-print(dir_list)
-
-
 import time
 import random
 from uuid import uuid4
 from io import BytesIO
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -38,9 +14,11 @@ from fastapi import (
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
 from pypdf import PdfReader
+load_dotenv(find_dotenv())
+print(f"Printing OPEN AI key: {os.getenv('OPENAI_API_KEY')}")
 from utils import AppManager, check_app_mode
 
-load_dotenv("/etc/secrets/.env")
+# load_dotenv("/etc/secrets/.env")
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
