@@ -3,7 +3,7 @@ import time
 import random
 from uuid import uuid4
 from io import BytesIO
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -16,7 +16,7 @@ from models import Message, Dataset
 from pypdf import PdfReader
 from utils import AppManager, check_app_mode
 
-load_dotenv(find_dotenv())
+load_dotenv("/etc/secrets/.env")
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
