@@ -14,11 +14,10 @@ from fastapi import (
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
 from pypdf import PdfReader
-load_dotenv(find_dotenv())
-print(f"Printing OPEN AI key: {os.getenv('OPENAI_API_KEY')}")
 from utils import AppManager, check_app_mode
 
 # load_dotenv("/etc/secrets/.env")
+load_dotenv(find_dotenv())
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
