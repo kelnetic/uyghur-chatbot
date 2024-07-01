@@ -63,7 +63,10 @@ def get_chat_engine(context_engine=get_context_engine()):
         context_engine=context_engine,
         history_pruner=RecentHistoryPruner(min_history_messages=1),
         system_prompt=get_system_prompt(),
-        llm = OpenAILLM(api_key=env.get("OPENAI_API_KEY"))
+        llm = OpenAILLM(
+            api_key=env.get("OPENAI_API_KEY"),
+            model_name="gpt-3.5-turbo"
+        )
     )
     return chat_engine
 
