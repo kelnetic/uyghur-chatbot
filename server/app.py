@@ -16,7 +16,6 @@ from models import Message, Dataset
 from pypdf import PdfReader
 from utils import AppManager, check_app_mode
 
-# load_dotenv("/etc/secrets/.env")
 load_dotenv(find_dotenv())
 env = os.environ
 app = FastAPI()

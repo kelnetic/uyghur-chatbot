@@ -1,6 +1,7 @@
 import os
 import yaml
 import boto3
+from dotenv import load_dotenv, find_dotenv
 from fastapi import HTTPException, status
 from canopy.tokenizer import Tokenizer
 from canopy.tokenizer.openai import OpenAITokenizer
@@ -12,6 +13,7 @@ from canopy.chat_engine import ChatEngine
 from canopy.chat_engine.history_pruner import RecentHistoryPruner
 from pinecone.grpc import PineconeGRPC as Pinecone
 
+load_dotenv(find_dotenv())
 env = os.environ
 Tokenizer.initialize(tokenizer_class=OpenAITokenizer, model_name="gpt-3.5-turbo")
 
