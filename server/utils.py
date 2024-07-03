@@ -61,7 +61,7 @@ def get_context_engine(kb=get_kb()):
 def get_chat_engine(context_engine=get_context_engine()):
     chat_engine = ChatEngine(
         context_engine=context_engine,
-        history_pruner=RecentHistoryPruner(min_history_messages=1),
+        history_pruner=RecentHistoryPruner(min_history_messages=2),
         system_prompt=get_system_prompt(),
         llm = OpenAILLM(
             api_key=env.get("OPENAI_API_KEY"),

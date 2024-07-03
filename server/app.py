@@ -8,8 +8,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     status,
-    Depends,
-    Request
+    Depends
 )
 from canopy.models.data_models import Document, UserMessage
 from models import Message, Dataset
@@ -57,19 +56,23 @@ def ingest_documents(dataset: Dataset):
             detail="The document with the provided metadata already exists"
         )
 
-    #Reads a PDF from S3 and extracts the text
+    #Reads a pdf/txt from S3 and extracts the text
     try:
-        pdf_obj = uc_core.s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
-        reader = PdfReader(BytesIO(pdf_obj["Body"].read()))
-        pdf_content = ""
-        for page in reader.pages:
-            pdf_content += page.extract_text()
+        file_ext = file_name.split(".")[-1]
+        text_content = ""
+        obj = uc_core.s3_client.get_object(Bucket=env.get("LOADING_BUCKET"), Key=file_name)
+        if file_ext == "pdf":
+            reader = PdfReader(BytesIO(obj["Body"].read()))
+            for page in reader.pages:
+                text_content += page.extract_text()
+        else: #else = txt
+            text_content += obj['Body'].read().decode('utf-8')
 
         #Upserts the content that was extracted
         id = str(uuid4())
         documents = [Document(
             id=id,
-            text=pdf_content,
+            text=text_content,
             source=query.pop("source"),
             metadata=query
             )]
@@ -101,17 +104,11 @@ def ingest_documents(dataset: Dataset):
     )
 
 @app.post("/chat")
-def chat(message: Message, request: Request):
-    # if request.headers.origin != 'https://uyghur-chatbot.streamlit.app/':
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="This operation is forbidden"
-    #     )
+def chat(message: Message):
     response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
     #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
     #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
-    print(f"Printing request headers: {request.headers}")
     content = response.choices[0].message.content
     context_values = set()
     context = []
