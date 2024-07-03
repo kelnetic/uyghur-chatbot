@@ -3,7 +3,6 @@ import time
 import random
 from uuid import uuid4
 from io import BytesIO
-from dotenv import load_dotenv
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -16,7 +15,6 @@ from models import Message, Dataset
 from pypdf import PdfReader
 from utils import AppManager, check_app_mode
 
-load_dotenv("/etc/secrets/.env")
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
@@ -102,16 +100,10 @@ def ingest_documents(dataset: Dataset):
 
 @app.post("/chat")
 def chat(message: Message, request: Request):
-    # if request.headers.origin != 'https://uyghur-chatbot.streamlit.app/':
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="This operation is forbidden"
-    #     )
     response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
     #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
     #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
-    print(f"Printing request headers: {request.headers}")
     content = response.choices[0].message.content
     context_values = set()
     context = []
