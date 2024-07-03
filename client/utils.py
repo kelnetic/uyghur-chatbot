@@ -1,5 +1,5 @@
-import streamlit as st
 import calendar
+import time
 from datetime import date
 
 def format_context_doc(doc):
@@ -31,3 +31,8 @@ def get_chat_inputs():
         "Ask me about Uyghur transnational repression",
         "Ask me about the Uyghur genocide"
     ]
+
+def get_response_iterable(response):
+    for word in response.split():
+        yield word + " "
+        time.sleep(0.05)

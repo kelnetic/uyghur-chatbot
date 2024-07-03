@@ -24,3 +24,9 @@ results = context_engine.query([Query(text="Who are the Uyghurs?")], max_context
 print(json.dumps(json.loads(results.to_text()), indent=2, ensure_ascii=False))
 print(f"\n# tokens in context returned: {results.num_tokens}")
 ```
+
+## Streamlit tips:
+To print to the console you can do:
+```
+os.write(1,f"{CODE}\n".encode()) 
+```

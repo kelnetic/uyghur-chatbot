@@ -2,12 +2,22 @@ import streamlit as st
 import requests
 import os
 import random
-from time import sleep
-from utils import format_context_doc, get_chat_inputs
+from utils import format_context_doc, get_chat_inputs, get_response_iterable
+
 endpoint = os.getenv("SERVER_ENDPOINT")
 context_icon = os.getenv("CONTEXT_ICON")
+welcome_text = os.getenv("WELCOME_TEXT")
 
 st.title("Uyghur Knowledge Assistant")
+
+# Write the welcome text
+if "welcome_text" not in st.session_state:
+    with st.chat_message("assistant"):
+        st.write_stream(get_response_iterable(welcome_text))
+    st.session_state.welcome_text = welcome_text
+else:
+    with st.chat_message("assistant"):
+        st.write(welcome_text)
 
 # Begin initializing session state vars
 if "messages" not in st.session_state:
@@ -44,8 +54,8 @@ if prompt := chat_input_ph.chat_input(st.session_state.placeholder):
         chat_response = requests.post(f'{endpoint}/chat', json=input_data)
 
     with st.chat_message("assistant"):
-        json_response = chat_response.json()['response']
-        st.write(json_response)
+        chat_content = chat_response.json()['response']
+        st.write_stream(get_response_iterable(chat_content))
 
     for doc in chat_response.json()['context']:
         with st.expander(label=f"{doc['title']}", icon=context_icon):
@@ -65,10 +75,3 @@ if prompt := chat_input_ph.chat_input(st.session_state.placeholder):
         "content": chat_response.json()
     })
     chat_input_ph.chat_input(st.session_state.placeholder)
-
-# Stream the output, either a manual one or with openAI/canopy
-# Format the response better
-    # with st.chat_message("context", avatar=":material/library_books:"):
-    #     json_response = chat_response.json()['context']
-    #     st.write(json_response)
-    # os.write(1,f"{multi}\n".encode()) 
