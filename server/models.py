@@ -5,6 +5,7 @@ from datetime import date
 
 class Message(BaseModel):
     content: str
+    chat_password: str
 
 class CategoryTypes(str, Enum):
     REPORT = "Report",

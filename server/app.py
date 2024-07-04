@@ -105,10 +105,15 @@ def ingest_documents(dataset: Dataset):
 
 @app.post("/chat")
 def chat(message: Message):
-    response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
     #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
     #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
+    if message.chat_password != env.get("CHAT_PASSWORD"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This operation is forbidden"
+        )
+    response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     content = response.choices[0].message.content
     context_values = set()
     context = []

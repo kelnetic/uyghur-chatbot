@@ -6,7 +6,7 @@ services:
       context: server/
       dockerfile: Dockerfile_server
     ports:
-      - "7860:7860"
+      - "10000:10000"
     networks:
       - app
     env_file:

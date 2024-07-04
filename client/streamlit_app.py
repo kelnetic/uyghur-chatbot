@@ -7,6 +7,7 @@ from utils import format_context_doc, get_chat_inputs, get_response_iterable
 endpoint = os.getenv("SERVER_ENDPOINT")
 context_icon = os.getenv("CONTEXT_ICON")
 welcome_text = os.getenv("WELCOME_TEXT")
+chat_password = os.getenv("CHAT_PASSWORD")
 
 st.title("Uyghur Knowledge Assistant")
 
@@ -49,7 +50,7 @@ if prompt := chat_input_ph.chat_input(st.session_state.placeholder):
         st.markdown(prompt)
 
     chat_response = None
-    input_data = {"content": prompt}
+    input_data = {"content": prompt, "chat_password": chat_password}
     with st.spinner("Thinking..."):
         chat_response = requests.post(f'{endpoint}/chat', json=input_data)
 
