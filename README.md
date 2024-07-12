@@ -1,12 +1,14 @@
 # uyghur-chatbot
 
-This is meant to be a RAG enabled chatbot that will provide users with information concerning the Uyghur genocide. 
+This is meant to be a RAG enabled chatbot that will provide users with information concerning the current Uyghur persecution. 
 The current plans are to:
 - ✅ Upload files, and extract text from them
 - ✅ Use Pinecone's Canopy framework to handle embedding, retrieval, and chatting
+- ✅ Use Streamlit to build a simple frontend view
+- ✅ Host on Streamlit cloud
 - 🔜 Will need to finetune the retrieval and chatting so that the chatbot produces detailed results, makes users ask more questions, and can carry a conversation
-- 🔜 Use Streamlit to build a simple frontend view
-- 🔜 Host on Huggingface Spaces 
+
+If you are interested in viewing the forked Canopy repo I have added changes to [please check out this link.](https://github.com/kelnetic/canopy)
 
 ## How to run the server locally:
 - Run `docker compose up --build`. The build configurations are contained in the Docker compose file.
