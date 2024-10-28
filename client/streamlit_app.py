@@ -32,10 +32,11 @@ for message in st.session_state.messages:
     else:
         with st.chat_message(message["role"]):
             st.markdown(message["content"]["response"])
-        for doc in message["content"]['context']:
-            with st.expander(label=f"{doc['title']}", icon=message['context_icon']):
-                formatted_doc = format_context_doc(doc)
-                st.markdown(formatted_doc)
+        if 'context' in message["content"]:
+            for doc in message["content"]['context']:
+                with st.expander(label=f"{doc['title']}", icon=message['context_icon']):
+                    formatted_doc = format_context_doc(doc)
+                    st.markdown(formatted_doc)
 
 if "placeholder_list" not in st.session_state:
     st.session_state.placeholder_list = get_chat_inputs()
@@ -58,10 +59,11 @@ if prompt := chat_input_ph.chat_input(st.session_state.placeholder):
         chat_content = chat_response.json()['response']
         st.write_stream(get_response_iterable(chat_content))
 
-    for doc in chat_response.json()['context']:
-        with st.expander(label=f"{doc['title']}", icon=context_icon):
-            formatted_doc = format_context_doc(doc)
-            st.markdown(formatted_doc)
+    if 'context' in chat_response.json():
+        for doc in chat_response.json()['context']:
+            with st.expander(label=f"{doc['title']}", icon=context_icon):
+                formatted_doc = format_context_doc(doc)
+                st.markdown(formatted_doc)
 
     #Shuffle the placeholders for next input
     past_placeholder = st.session_state.placeholder

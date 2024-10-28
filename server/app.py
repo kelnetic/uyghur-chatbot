@@ -118,7 +118,7 @@ def chat(message: Message):
         response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
     except Exception as error:
         logging.error(f"An error occurred from the chat engine: {error}")
-        return {"response": "Sorry, I'm unable to help you with that"}
+        return {"response": "Sorry, I'm unable to help you with that."}
     content = response.choices[0].message.content
     context_values = set()
     context = []
@@ -142,4 +142,3 @@ def chat(message: Message):
                 context.append(context_item)
 
     return {"response": content, "context": context}
-
