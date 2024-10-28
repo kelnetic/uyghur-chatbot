@@ -1,8 +1,10 @@
 import os
 import time
 import random
+import logging
 from uuid import uuid4
 from io import BytesIO
+from dotenv import load_dotenv, find_dotenv
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -14,6 +16,7 @@ from models import Message, Dataset
 from pypdf import PdfReader
 from utils import AppManager, check_app_mode
 
+load_dotenv(find_dotenv())
 env = os.environ
 app = FastAPI()
 #UyghurChatbot Core
@@ -21,9 +24,8 @@ uc_core = AppManager()
 
 """
 TODO
- - Maybe have a logging function that outputs to a txt file? that uploads to s3
- - Guarantee that the chatbot will confirm the existence of a chatbot as well as East Turkestan, whenever Xinjiang is mentioned
- - But we could hardcode East Turkestan to always appear before Xinjiang
+ - Maybe have a logging function that outputs to a txt file, that uploads to s3
+ - Guarantee that the chatbot will confirm the existence of East Turkestan
 """
 
 @app.post("/ingest", dependencies=[Depends(check_app_mode)])
@@ -103,7 +105,16 @@ def ingest_documents(dataset: Dataset):
 
 @app.post("/chat")
 def chat(message: Message):
-    response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
+    if message.chat_password != env.get("CHAT_PASSWORD"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This operation is forbidden"
+        )
+    try:
+        response = uc_core.chat_engine.chat(messages=[UserMessage(content=message.content)])
+    except Exception as error:
+        logging.error(f"An error occurred from the chat engine: {error}")
+        return {"response": "Sorry, I'm unable to help you with that."}
     content = response.choices[0].message.content
     context_values = set()
     context = []
