@@ -143,36 +143,3 @@ def chat(message: Message):
 
     return {"response": content, "context": context}
 
-@app.post("/test")
-def test(message: Message):
-    response = uc_core.chat_engine._get_context(messages=[UserMessage(content=message.content)])
-    print(type(response))
-    # print(response.content.json())
-    # print(response.content.model_dump())
-    filtered_content = _filter_content(response.content)
-    print(type(response.content))
-    print(type(filtered_content))
-    response.model_copy(update={"content": filtered_content})
-    return response
-    # results = uc_core.kb.query([Query(text=message.content)])
-    # print(results)
-    # return results
-
-def _filter_content(
-                    content,
-                    threshold = 0.1
-                    ):
-    """
-    Filter out context snippets if the score doesn't reach the threshold. Otherwise raise an exception if all snippets are filtered out.
-    """
-    content_type = type(content)
-    content = content.model_dump()
-    for content_context in content:
-        content_context["snippets"] = [
-            snippet for snippet in content_context["snippets"] if (snippet['score'] > threshold)
-        ]
-    # print(content.content)
-    if not any(content_context['snippets'] for content_context in content):
-        raise Exception("No relevant snippets of context retrieved")
-    # return content
-    return content_type.model_validate(content)
