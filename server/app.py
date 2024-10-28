@@ -24,9 +24,8 @@ uc_core = AppManager()
 
 """
 TODO
- - Maybe have a logging function that outputs to a txt file? that uploads to s3
- - Guarantee that the chatbot will confirm the existence of a chatbot as well as East Turkestan, whenever Xinjiang is mentioned
- - But we could hardcode East Turkestan to always appear before Xinjiang
+ - Maybe have a logging function that outputs to a txt file, that uploads to s3
+ - Guarantee that the chatbot will confirm the existence of East Turkestan
 """
 
 @app.post("/ingest", dependencies=[Depends(check_app_mode)])
@@ -106,9 +105,6 @@ def ingest_documents(dataset: Dataset):
 
 @app.post("/chat")
 def chat(message: Message):
-    #TODO: Check the response choices and see what message is the best, should it be the longest message? The one with the most statistics? Mentions of genocide?
-    #Can create a custom instance of query generator with a defualt system prompt that might be able to add more queries
-    #I think in the query generator, can include a sentence to not send a function if it asking what the purpose of the chatbot is, or who "you" are
     if message.chat_password != env.get("CHAT_PASSWORD"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
